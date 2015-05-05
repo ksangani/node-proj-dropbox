@@ -1,0 +1,35 @@
+{
+  "name": "node-proj-dropbox",
+  "version": "1.0.0",
+  "description": "Basic DropBox in node.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon --exec babel-node --optional strict --stage 1 -- index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksangani/node-proj-dropbox.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ksangani/node-proj-dropbox/issues"
+  },
+  "homepage": "https://github.com/ksangani/node-proj-dropbox#readme",
+  "dependencies": {
+    "bluebird": "^2.9.25",
+    "bluebird-nodeify": "^1.0.0",
+    "body-parser": "^1.12.3",
+    "compression": "^1.4.3",
+    "errorhandler": "^1.3.5",
+    "express": "^4.12.3",
+    "longjohn": "^0.2.4",
+    "method-override": "^2.3.2",
+    "mime-types": "^2.0.10",
+    "mkdirp": "^0.5.0",
+    "morgan": "^1.5.2",
+    "rimraf": "^2.3.3",
+    "songbird": "^1.0.1",
+    "yargs": "^3.8.0"
+  }
+}
