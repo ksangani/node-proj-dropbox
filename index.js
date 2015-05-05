@@ -2,16 +2,13 @@ let express = require('express')
 let morgan = require('morgan')
 let nodeify = require('bluebird-nodeify')
 //let bluebird = require('bluebird')
-let http = require('http')
 let fs = require('fs')
 let path = require('path')
 let mime = require('mime-types')
 let rimraf = require('rimraf')
 let mkdirp = require('mkdirp')
-
-let bodyParser     = require('body-parser');
-let methodOverride = require('method-override');
-let compression = require('compression');
+let bodyParser = require('body-parser');
+let jot = require('json-over-tcp');
 
 let argv = require('yargs')
   .usage('\nUsage: $0 [options]')
@@ -42,7 +39,15 @@ if (NODE_ENV === 'dev') {
   app.use(morgan('dev'))
 }
 
-app.listen(PORT, () => console.log(`Listening @http://127.0.0.1:${PORT}`))
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({
+    extended: true
+})) 
+
+console.log(`Using root dir@${ROOT_DIR}`)
+
+// HTTP
+app.listen(PORT, () => console.log(`HTTP server listening @http://127.0.0.1:${PORT}`))
 
 app.head('*', setFileMeta, setHeaders, (req, res) => res.end())
 
@@ -58,6 +63,9 @@ app.put('*', setFileMeta, setDirMeta, (req, res, next) => {
         await mkdirp.promise(req.dirPath)    
         if(!req.isDir) {
             req.pipe(fs.createWriteStream(req.filePath))
+            // let buffer = await fs.promise.readFile(req.filePath)
+            // console.log(buffer)
+            sendOverTcp(TCP.UPDATE, req.path, TCP.FILE, null)
         }
         res.end()
     }().catch(next)
@@ -68,9 +76,10 @@ app.post('*', setFileMeta, setDirMeta, (req, res, next) => {
         if(req.isDir) return res.status(405).send('Path is a directory')            
         if(!req.stat) return res.status(405).send('File does not exist')
 
-        await fs.promise.truncate(req.filePath, 0)        
+        await fs.promise.truncate(req.filePath, 0)
         req.pipe(fs.createWriteStream(req.filePath))
         res.end()
+        sendOverTcp(TCP.UPDATE, req.path, TCP.FILE, null)
     }().catch(next)
 })
 
@@ -79,8 +88,10 @@ app.delete('*', setFileMeta, (req, res, next) => {
         if(!req.stat) return res.status(405).send('Path does not exist')
         if(req.stat.isDirectory()) {
             await rimraf.promise(req.filePath)
+            sendOverTcp(TCP.DELETE, req.path, TCP.DIR, null)
         } else {
             await fs.promise.unlink(req.filePath)
+            sendOverTcp(TCP.DELETE, req.path, TCP.FILE, null)
         }
         res.end()
     }().catch(next)
@@ -120,4 +131,35 @@ function setHeaders(req, res, next) {
         res.setHeader('Content-Length', req.stat.size)
         res.setHeader('Content-Type', mime.contentType(path.extname(req.filePath)))
     }(), next)
+}
+
+
+// TCP
+const TCP = {
+    "PORT" : "8888",
+    "FILE" : "file",
+    "DIR" : "dir",
+    "CREATE" : "create",
+    "UPDATE" : "update",
+    "DELETE" : "delete"
+}
+
+let server = jot.createServer(TCP.PORT);
+let clients = [];
+
+server.on('connection', (socket) => {
+    clients.push(socket)
+    socket.on('close', () => clients.remove(socket))
+});
+
+server.listen(TCP.PORT, () => console.log(`TCP server listening @tcp://127.0.0.1:${TCP.PORT}`))
+
+async function sendOverTcp(action, path, type, contents, updated) {
+    await clients.forEach((client) => client.write({
+        "action": action,
+        "path": path,
+        "type": type,
+        "contents": contents,
+        "updated": Date.now()
+    }))
 }
