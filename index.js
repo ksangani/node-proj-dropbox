@@ -7,8 +7,10 @@ let path = require('path')
 let mime = require('mime-types')
 let rimraf = require('rimraf')
 let mkdirp = require('mkdirp')
-let bodyParser = require('body-parser');
+let bodyParser     = require('body-parser');
 let jot = require('json-over-tcp');
+let constants = require('./constants')
+require('songbird')
 
 let argv = require('yargs')
   .usage('\nUsage: $0 [options]')
@@ -16,15 +18,12 @@ let argv = require('yargs')
   .version('1.0.0', 'version').alias('version', 'V')
   .options({
     dir: {
-        description: "Destination directory"
+        description: "Destination directory (default: process.cwd())"
     }
   })
   .example('$0 --dir /some/root/dir', 'Uses destination directory')
   .epilog('See https://github.com/ksangani/node-proj-dropbox#readme for details')
   .argv
-
-require('songbird')
-//require('longjohn')
 
 const NODE_ENV = process.env.NODE_ENV || 'dev'
 const PORT = process.env.PORT || 8000
@@ -39,12 +38,12 @@ if (NODE_ENV === 'dev') {
   app.use(morgan('dev'))
 }
 
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({
-    extended: true
-})) 
+// app.use(bodyParser.json())
+// app.use(bodyParser.urlencoded({
+//     extended: true
+// })) 
 
-console.log(`Using root dir@${ROOT_DIR}`)
+console.log(`Using destination dir@${ROOT_DIR}`)
 
 // HTTP
 app.listen(PORT, () => console.log(`HTTP server listening @http://127.0.0.1:${PORT}`))
@@ -63,9 +62,8 @@ app.put('*', setFileMeta, setDirMeta, (req, res, next) => {
         await mkdirp.promise(req.dirPath)    
         if(!req.isDir) {
             req.pipe(fs.createWriteStream(req.filePath))
-            // let buffer = await fs.promise.readFile(req.filePath)
-            // console.log(buffer)
-            sendOverTcp(TCP.UPDATE, req.path, TCP.FILE, null)
+            let buffer = await fs.promise.readFile(req.filePath)
+            sendOverTcp(constants.CREATE, req.path, constants.FILE, buffer.toString(constants.BASE_64))
         }
         res.end()
     }().catch(next)
@@ -79,7 +77,8 @@ app.post('*', setFileMeta, setDirMeta, (req, res, next) => {
         await fs.promise.truncate(req.filePath, 0)
         req.pipe(fs.createWriteStream(req.filePath))
         res.end()
-        sendOverTcp(TCP.UPDATE, req.path, TCP.FILE, null)
+        let buffer = await fs.promise.readFile(req.filePath)
+        sendOverTcp(constants.UPDATE, req.path, constants.FILE, buffer.toString(constants.BASE_64))
     }().catch(next)
 })
 
@@ -88,10 +87,10 @@ app.delete('*', setFileMeta, (req, res, next) => {
         if(!req.stat) return res.status(405).send('Path does not exist')
         if(req.stat.isDirectory()) {
             await rimraf.promise(req.filePath)
-            sendOverTcp(TCP.DELETE, req.path, TCP.DIR, null)
+            sendOverTcp(constants.DELETE, req.path, constants.DIR, null)
         } else {
             await fs.promise.unlink(req.filePath)
-            sendOverTcp(TCP.DELETE, req.path, TCP.FILE, null)
+            sendOverTcp(constants.DELETE, req.path, constants.FILE, null)
         }
         res.end()
     }().catch(next)
@@ -135,24 +134,20 @@ function setHeaders(req, res, next) {
 
 
 // TCP
-const TCP = {
-    "PORT" : "8888",
-    "FILE" : "file",
-    "DIR" : "dir",
-    "CREATE" : "create",
-    "UPDATE" : "update",
-    "DELETE" : "delete"
-}
-
-let server = jot.createServer(TCP.PORT);
+let server = jot.createServer(constants.TCP_PORT);
 let clients = [];
 
 server.on('connection', (socket) => {
+    console.log("Connected to client")
     clients.push(socket)
-    socket.on('close', () => clients.remove(socket))
+
+    socket.on('close', () =>  {
+        clients.splice(clients.indexOf(socket), 1)
+        console.log("Disconnected from client")
+    })
 });
 
-server.listen(TCP.PORT, () => console.log(`TCP server listening @tcp://127.0.0.1:${TCP.PORT}`))
+server.listen(constants.TCP_PORT, () => console.log(`TCP server listening @tcp://127.0.0.1:${constants.TCP_PORT}`))
 
 async function sendOverTcp(action, path, type, contents, updated) {
     await clients.forEach((client) => client.write({

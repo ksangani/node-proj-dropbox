@@ -4,7 +4,8 @@
   "description": "Basic DropBox in node.js",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon --exec babel-node --optional strict --stage 1 -- index.js"
+    "start": "nodemon --exec babel-node --optional strict --stage 1 -- index.js",
+    "client": "nodemon --exec babel-node --optional strict --stage 1 -- client.js"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 # DropBox
 This is a basic Dropbox clone to sync files across multiple remote folders.
 
-Time spent: 1
+Time spent: 4
 
 ### Features
 
@@ -13,7 +13,7 @@ Time spent: 1
 - [x] Client can make POST requests to update the contents of a file
 - [x] Client can make DELETE requests to delete files and folders
 - [x] Server will serve from `--dir` or cwd as root
-- [ ] Client will sync from server over TCP to cwd or CLI `dir` argument
+- [x] Client will sync from server over TCP to cwd or CLI `dir` argument
 
 #### Optional
 
@@ -26,3 +26,4 @@ Time spent: 1
 - [ ] User can connect to the server using an FTP client
 
 #### Walkthrough
+![Video Walkthrough](node-dropbox.gif)
